@@ -1,0 +1,104 @@
+# =======================================
+# Flutter & Dart
+# =======================================
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+*.dart.js
+*.info.json
+*.js_
+*.js.deps
+*.js.map
+*.dill
+*.tmp
+
+# =======================================
+# Firebase (KEEP CONFIG FILES)
+# =======================================
+# These are required so teammates can run app without extra setup
+# Do NOT ignore these:
+# android/app/google-services.json
+# ios/Runner/GoogleService-Info.plist
+# firebase.json
+# .firebaserc
+
+# =======================================
+# Android
+# =======================================
+*.iml
+.gradle/
+local.properties
+**/captures/
+**/outputs/
+**/.cxx/
+**/ndk/
+**/intermediates/
+**/generated/
+**/build/
+android/key.properties
+android/app/release/
+android/app/debug/
+android/app/profile/
+
+# =======================================
+# iOS & macOS
+# =======================================
+**/Pods/
+**/.symlinks/
+**/DerivedData/
+**/build/
+*.xcworkspace
+*.xcuserstate
+*.xcuserdata/
+*.lock
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+macos/Flutter/ephemeral/
+
+# =======================================
+# Web
+# =======================================
+lib/generated_plugin_registrant.dart
+web/.dart_tool/
+web/.firebase/
+web/.cache/
+web/assets/packages/
+
+# =======================================
+# Visual Studio Code & IntelliJ
+# =======================================
+.vscode/
+.idea/
+*.code-workspace
+
+# =======================================
+# Logs & Temp Files
+# =======================================
+*.log
+*.tmp
+*.bak
+*.swp
+*.lock
+*.DS_Store
+*.env
+*.env.local
+*.env.*
+!.env.example
+
+# =======================================
+# Generated Files (Build-Time)
+# =======================================
+*.g.dart
+*.freezed.dart
+*.mocks.dart

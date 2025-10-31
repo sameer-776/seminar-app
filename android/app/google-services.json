@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "890946382807",
+    "project_id": "college-seminar",
+    "storage_bucket": "college-seminar.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:890946382807:android:66ae74e204af36cfe77992",
+        "android_client_info": {
+          "package_name": "com.example.seminar2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "890946382807-q1hnbo70gev3v0pdpf7vpl7b5of3401c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.seminar2",
+            "certificate_hash": "271dba210da5c924c229953e732c51ad7ea544b4"
+          }
+        },
+        {
+          "client_id": "890946382807-k18laj5eoh7q95jri52d3urm5nei1g9j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0uM5FMi2MUa2DBnZhOj7DAKXQnAVDmqo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "890946382807-k18laj5eoh7q95jri52d3urm5nei1g9j.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "890946382807-0437kivos79oqc9ebeq8o4q52065j0pq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.seminar2"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

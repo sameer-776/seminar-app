@@ -1,0 +1,27 @@
+# Flutter / Android ignore
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.gradle/
+build/
+bin/
+node_modules/
+*.log
+*.tmp
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.dart_tool/
+android/.gradle/
+android/.idea/
+android/local.properties
+android/.cxx/
+*.iml
+AppData/
+Downloads/
+OneDrive/
+NTUSER.DAT*
+*.regtrans-ms
+

@@ -1,0 +1,28 @@
+mutation CreateNewUser($displayName: String!, $email: String, $photoUrl: String) @auth(level: USER) {
+  user_insert(data: {displayName: $displayName, email: $email, photoUrl: $photoUrl, createdAt_expr: "request.time"}) {
+    id
+  }
+}
+
+query GetPublicEvents @auth(level: PUBLIC) {
+  events(where: {isPublic: {eq: true}}) {
+    id
+    title
+    description
+    startDate
+    startTime
+    location
+  }
+}
+
+mutation CreateNewEvent($title: String!, $description: String, $startDate: Date!, $startTime: Timestamp!, $location: String!, $category: String, $imageUrl: String, $isPublic: Boolean!) @auth(level: USER) {
+  event_insert(data: {title: $title, description: $description, startDate: $startDate, startTime: $startTime, location: $location, category: $category, imageUrl: $imageUrl, isPublic: $isPublic, userId_expr: "auth.uid", createdAt_expr: "request.time"}) {
+    id
+  }
+}
+
+mutation UpdateTaskCompletion($id: UUID!, $isCompleted: Boolean!) @auth(level: USER) {
+  task_update(key: {id: $id}, data: {isCompleted: $isCompleted}) {
+    id
+  }
+}

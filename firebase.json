@@ -1,0 +1,39 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "college-seminar",
+          "appId": "1:890946382807:android:66ae74e204af36cfe77992",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "college-seminar",
+          "configurations": {
+            "android": "1:890946382807:android:66ae74e204af36cfe77992",
+            "ios": "1:890946382807:ios:d5149848881a6371e77992",
+            "web": "1:890946382807:web:ace4c6d3f909db80e77992"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint"
+      ],
+      "source": "functions"
+    }
+  ]
+}

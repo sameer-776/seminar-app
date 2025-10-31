@@ -1,0 +1,75 @@
+name: seminar_booking_app
+description: A comprehensive seminar hall booking application for Poornima University.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  image_picker: ^1.1.2  # Or the latest version
+  firebase_storage: ^11.7.7 # Or the latest version
+  path: ^1.9.0
+
+  # Firebase
+  firebase_core: ^2.32.0
+  firebase_auth: ^4.20.0
+  cloud_firestore: ^4.17.5
+  firebase_messaging: ^14.9.4
+
+  # State Management & Routing
+  provider: ^6.1.2
+  go_router: ^14.2.0
+
+  # UI & Styling
+  google_fonts: ^6.2.1
+  material_design_icons_flutter: ^7.0.7296
+  badges: ^3.1.2
+
+  # Utility
+  intl: ^0.19.0
+  collection: ^1.18.0
+  url_launcher: ^6.3.0
+  fl_chart: ^0.68.0
+  table_calendar: ^3.1.1
+  cloud_functions: ^4.7.6
+
+  csv: ^6.0.0
+  path_provider: ^2.1.3
+  share_plus: ^9.0.0
+
+  font_awesome_flutter: ^10.7.0
+
+  flutter_animate: ^4.5.0 # Or latest
+
+  google_sign_in: ^6.2.1
+  flutter_local_notifications: ^17.1.2
+
+  # For opening social links in the "About Us" dialog
+url_launcher: ^6.3.0 # Or latest
+
+  # For the Analytics Export feature
+csv: ^6.0.0 # Or latest
+path_provider: ^2.1.3 # Or latest
+share_plus: ^9.0.0 #
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/logo.png
+    - assets/images/sameer_avatar.jpg
+
+flutter_launcher_icons:
+  image_path: "assets/logo.png"
+  android: true
+  ios: true

@@ -1,0 +1,37 @@
+type User @table {
+  displayName: String!
+  createdAt: Timestamp!
+  email: String
+  photoUrl: String
+}
+
+type Event @table {
+  title: String!
+  startTime: Timestamp!
+  startDate: Date!
+  location: String!
+  isPublic: Boolean!
+  createdAt: Timestamp!
+  description: String
+  imageUrl: String
+  endTime: Timestamp
+  endDate: Date
+  category: String
+  user: User
+}
+
+type Attendee @table {
+  rsvpStatus: String!
+  invitedAt: Timestamp!
+  notes: String
+  event: Event
+  user: User
+}
+
+type Task @table {
+  description: String!
+  isCompleted: Boolean!
+  createdAt: Timestamp!
+  dueDate: Timestamp
+  event: Event
+}

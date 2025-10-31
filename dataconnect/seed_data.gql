@@ -1,0 +1,68 @@
+mutation CreateDemoData @transaction @auth(level: USER) {
+  user_insertMany(data: [
+    {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      displayName: "demouser1",
+      createdAt: "2024-01-01T00:00:00Z"
+    },
+    {
+      id: "550e8400-e29b-41d4-a716-446655440001",
+      displayName: "demouser2",
+      createdAt: "2024-01-01T00:00:00Z"
+    }
+  ])
+  event_insertMany(data: [
+    {
+      id: "650e8400-e29b-41d4-a716-446655440002",
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      title: "Demo Event 1",
+      location: "Demo Location 1",
+      isPublic: true,
+      startDate: "2024-01-05",
+      startTime: "2024-01-05T10:00:00Z",
+      createdAt: "2024-01-01T00:00:00Z"
+    },
+    {
+      id: "650e8400-e29b-41d4-a716-446655440003",
+      userId: "550e8400-e29b-41d4-a716-446655440001",
+      title: "Demo Event 2",
+      location: "Demo Location 2",
+      isPublic: false,
+      startDate: "2024-01-06",
+      startTime: "2024-01-06T12:00:00Z",
+      createdAt: "2024-01-02T00:00:00Z"
+    }
+  ])
+  task_insertMany(data: [
+    {
+      id: "750e8400-e29b-41d4-a716-446655440004",
+      eventId: "650e8400-e29b-41d4-a716-446655440002",
+      description: "Demo Task 1",
+      isCompleted: false,
+      createdAt: "2024-01-03T00:00:00Z"
+    },
+    {
+      id: "750e8400-e29b-41d4-a716-446655440005",
+      eventId: "650e8400-e29b-41d4-a716-446655440003",
+      description: "Demo Task 2",
+      isCompleted: true,
+      createdAt: "2024-01-04T00:00:00Z"
+    }
+  ])
+  attendee_insertMany(data: [
+    {
+      id: "850e8400-e29b-41d4-a716-446655440006",
+      eventId: "650e8400-e29b-41d4-a716-446655440002",
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      invitedAt: "2024-01-04T00:00:00Z",
+      rsvpStatus: "accepted"
+    },
+    {
+      id: "850e8400-e29b-41d4-a716-446655440007",
+      eventId: "650e8400-e29b-41d4-a716-446655440003",
+      userId: "550e8400-e29b-41d4-a716-446655440001",
+      invitedAt: "2024-01-05T00:00:00Z",
+      rsvpStatus: "pending"
+    }
+  ])
+}
