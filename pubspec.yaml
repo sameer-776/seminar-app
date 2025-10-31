@@ -68,6 +68,9 @@ flutter:
   assets:
     - assets/logo.png
     - assets/images/sameer_avatar.jpg
+    - assets/images/mohit.jpg
+    - assets/images/Aryan.jpg
+    - assets/images/kshitij.jpg
 
 flutter_launcher_icons:
   image_path: "assets/logo.png"

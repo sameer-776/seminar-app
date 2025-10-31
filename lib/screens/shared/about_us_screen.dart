@@ -19,35 +19,35 @@ class AboutUsScreen extends StatelessWidget {
       'regNo': '2024/17768',
       'avatarAssetPath': 'assets/images/sameer_avatar.jpg',
       'email': '2024btechaimlsameer17768@poornima.edu.in',
-      'linkedinUrl': 'LINKEDIN_URL',
-      'githubUrl': 'GITHUB_URL',
+      'linkedinUrl': 'https://www.linkedin.com/in/sameer-beniwal/',
+      'githubUrl': 'https://github.com/sameer-776',
     },
     {
       'name': 'Mohit Kumar',
-      'role': 'Backend Developer',
+      'role': 'Developer',
       'course': 'BCA MA & FSD',
       'regNo': '2024/19405',
-      'avatarAssetPath': 'assets/images/mohit_avatar.jpg',
+      'avatarAssetPath': 'assets/images/mohit.jpg',
       'email': '2024bcamafsmohit19405@poornima.edu.in',
-      'linkedinUrl': 'LINKEDIN_URL',
-      'githubUrl': 'GITHUB_URL',
+      'linkedinUrl': 'https://www.linkedin.com/in/mohit-kumar-00bb50202/',
+      'githubUrl': 'https://github.com/mohit31kumar',
     },
     {
       'name': 'Aryan Gaikwad',
       'role': 'Developer',
       'course': 'B.Tech AIML',
       'regNo': '2024/18800',
-      'avatarAssetPath': 'assets/images/aryan_avatar.jpg',
+      'avatarAssetPath': 'assets/images/Aryan.jpg',
       'email': '2024btechaimlaryan18800@poornima.edu.in',
-      'linkedinUrl': 'LINKEDIN_URL',
-      'githubUrl': 'GITHUB_URL',
+      'linkedinUrl': 'linkdin_url/',
+      'githubUrl': 'https://github.com/aryan-gaikwad30',
     },
     {
       'name': 'Kshitij Soni',
-      'role': 'Frontend Developer',
+      'role': 'Developer',
       'course': 'BCA cyber Security',
       'regNo': '2024/18810',
-      'avatarAssetPath': 'assets/images/kshitij_avatar.jpg',
+      'avatarAssetPath': 'assets/images/kshitij.jpg',
       'email': '2024bcacyberkshitij004@poornima.edu.in',
       'linkedinUrl': 'LINKEDIN_URL',
       'githubUrl': 'GITHUB_URL',
@@ -79,7 +79,6 @@ class AboutUsScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent, 
         elevation: 0,
-        // ✅ Use AppText for title for consistency, though standard Text is fine too
         title: const AppText('About Us', color: Colors.white), 
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -128,12 +127,10 @@ class AboutUsScreen extends StatelessWidget {
             GlassContainer(
               borderRadius: 20,
               padding: const EdgeInsets.all(20),
-              backgroundColor: Colors.white.withAlpha(20), // 0.08 * 255
-              border: Border.all(color: Colors.white.withAlpha(30)), // 0.12 * 255
-              // ✅ ADDED const
+              backgroundColor: Colors.white.withAlpha(20),
+              border: Border.all(color: Colors.white.withAlpha(30)),
               child: const Column(
                 children: [
-                  // ✅ ADDED const
                   AppText(
                     "“From Zero Comes Innovation — That’s ŚŪNYA.”",
                     variant: AppTextVariant.body,
@@ -141,11 +138,9 @@ class AboutUsScreen extends StatelessWidget {
                     color: Colors.white,
                     style: TextStyle(fontStyle: FontStyle.italic),
                   ),
-                  // ✅ ADDED const
                   SizedBox(height: 12),
-                  // ✅ ADDED const
                   AppText(
-                    "We’re a group of AI enthusiasts from Poornima University dedicated to creating efficient and impactful digital solutions.",
+                    "We’re a Team of AI enthusiast students from Poornima University dedicated to creating efficient and impactful digital solutions.",
                     variant: AppTextVariant.body,
                     textAlign: TextAlign.center,
                     color: Colors.white70,
@@ -193,7 +188,6 @@ class AboutUsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 50),
 
-            // ✅ ADDED const
             const Column(
               children: [
                 AppText(
@@ -213,9 +207,6 @@ class AboutUsScreen extends StatelessWidget {
                 ),
               ],
             )
-             // ✅ Moved animations to wrap the individual Text widgets
-             // for better composability, though your original way is also fine.
-             // Kept your original animation on the parent Column for simplicity.
              .animate()
              .fadeIn(delay: 300.ms)
              .scale(begin: const Offset(0.9, 0.9)),
