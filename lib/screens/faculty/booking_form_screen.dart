@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:seminar_booking_app/models/booking.dart';
 import 'package:seminar_booking_app/models/seminar_hall.dart';
 import 'package:seminar_booking_app/providers/app_state.dart';
-import 'package:seminar_booking_app/services/firestore_service.dart';
+import 'package:seminar_booking_app/services/firestore_service.dart'; // Import service
 
 class BookingFormScreen extends StatefulWidget {
   final SeminarHall hall;
@@ -32,9 +32,39 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   final _attendeesController = TextEditingController();
   final _requirementsController = TextEditingController();
   bool _isLoading = false;
+  
+  Booking? _conflictingBooking;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkInitialConflict();
+    });
+  }
 
   String _formatTime(TimeOfDay time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _checkInitialConflict() {
+    final appState = context.read<AppState>();
+    final formattedDate = DateFormat('yyyy-MM-dd').format(widget.date);
+    final formattedStart = _formatTime(widget.startTime);
+    final formattedEnd = _formatTime(widget.endTime);
+
+    final conflict = appState.getConflictingBooking(
+      widget.hall.name, 
+      formattedDate, 
+      formattedStart, 
+      formattedEnd
+    );
+
+    if (conflict != null) {
+      setState(() {
+        _conflictingBooking = conflict;
+      });
+    }
   }
 
   Future<void> _submitRequest() async {
@@ -74,30 +104,33 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       );
 
       try {
-        // 1. Submit the booking (This will throw if there is a conflict)
+        // 1. Submit the booking
         await appState.submitBooking(newBooking);
 
-        // 2. Manually Notify Admins
-        // Fetch all users to find admins (quickest way without Cloud Functions)
-        final allUsersStream = firestoreService.getAllUsers();
-        final allUsers = await allUsersStream.first;
-        final admins = allUsers.where((u) => u.role == 'admin').toList();
+        // 2. ✅ MANUALLY NOTIFY ADMINS
+        // We need to find all admin users and send them a notification
+        try {
+          // Ideally, we would have a better way to get admins, but querying all users works for small apps
+          final allUsersStream = firestoreService.getAllUsers();
+          final allUsers = await allUsersStream.first;
+          final admins = allUsers.where((u) => u.role == 'admin').toList();
 
-        for (var admin in admins) {
-          await firestoreService.createNotification(
-            userId: admin.uid,
-            title: 'New Booking Request',
-            body: '${currentUser.name} has requested ${widget.hall.name}.',
-            bookingId: null, 
-          );
+          for (var admin in admins) {
+            await firestoreService.createNotification(
+              userId: admin.uid,
+              title: 'New Request Submitted',
+              body: '${currentUser.name} has requested ${widget.hall.name} for ${DateFormat.yMMMd().format(widget.date)}.',
+              bookingId: null, // We don't have the ID here easily, but that's okay
+            );
+          }
+        } catch (e) {
+          print("Error sending admin notifications: $e");
         }
 
         if (mounted) {
-          // Success! Go to confirmation
           context.go('/booking/confirmation');
         }
       } catch (e) {
-        // ❌ Conflict or Error Caught Here
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -124,6 +157,40 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              
+              if (_conflictingBooking != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    border: Border.all(color: Colors.red),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text("Time Conflict!", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "This hall is already booked from ${_conflictingBooking!.startTime} to ${_conflictingBooking!.endTime}.",
+                        style: const TextStyle(color: Colors.black87),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        "Please go back and choose a different time.",
+                        style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+
               _buildSummaryCard(),
               const SizedBox(height: 24),
               TextFormField(controller: _titleController, decoration: const InputDecoration(labelText: 'Event Title', border: OutlineInputBorder()), validator: (v) => v!.isEmpty ? 'This field is required' : null),
@@ -146,8 +213,9 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
               const SizedBox(height: 16),
               TextFormField(controller: _requirementsController, decoration: const InputDecoration(labelText: 'Additional Requirements (Optional)', border: OutlineInputBorder()), maxLines: 2),
               const SizedBox(height: 24),
+              
               ElevatedButton(
-                onPressed: _isLoading ? null : _submitRequest,
+                onPressed: (_isLoading || _conflictingBooking != null) ? null : _submitRequest,
                 style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
                 child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('Submit Request'),
               )
