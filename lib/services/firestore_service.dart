@@ -153,6 +153,12 @@ class FirestoreService {
     return _db.collection('bookings').add(booking.toJson());
   }
 
+  /// ✅ NEW: Adds a booking and returns the document ID
+  Future<String> addBookingAndGetRef(Booking booking) async {
+    final docRef = await _db.collection('bookings').add(booking.toJson());
+    return docRef.id;
+  }
+
   Future<void> updateBooking(String bookingId, Map<String, dynamic> data) {
     return _db.collection('bookings').doc(bookingId).update(data);
   }
@@ -165,6 +171,21 @@ class FirestoreService {
   }
   
   // --- NOTIFICATION METHODS ---
+  
+  /// ✅ NEW: Gets all admin UIDs from the users collection
+  Future<List<String>> getAllAdminUIDs() async {
+    try {
+      final snapshot = await _db
+          .collection('users')
+          .where('role', isEqualTo: 'admin')
+          .get();
+      return snapshot.docs.map((doc) => doc.id).toList();
+    } catch (e) {
+      print('Error getting admin UIDs: $e');
+      return [];
+    }
+  }
+  
   Stream<List<AppNotification>> getNotifications(String userId) {
     return _db
         .collection('notifications')

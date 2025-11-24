@@ -225,7 +225,27 @@ class AppState with ChangeNotifier {
     if (checkBookingConflict(booking.hall, booking.date, booking.startTime, booking.endTime)) {
       throw Exception("This time slot is already booked! Please choose another time.");
     }
-    await firestoreService.addBooking(booking);
+    
+    // 1. Create the booking document
+    final bookingDocRef = await firestoreService.addBookingAndGetRef(booking);
+    
+    // 2. ✅ NEW: Create notifications for all admins
+    try {
+      final adminUIDs = await firestoreService.getAllAdminUIDs();
+      if (adminUIDs.isNotEmpty) {
+        for (final adminUID in adminUIDs) {
+          await firestoreService.createNotification(
+            userId: adminUID,
+            title: 'New Booking Request',
+            body: '${booking.requestedBy} has requested ${booking.hall} for ${booking.date}.',
+            bookingId: bookingDocRef,
+          );
+        }
+      }
+    } catch (e) {
+      print('Error creating admin notifications: $e');
+      // Don't rethrow - booking was successfully created, just notification failed
+    }
   }
 
   Future<void> cancelBooking(String bookingId) async {

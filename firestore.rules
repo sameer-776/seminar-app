@@ -1,18 +1,51 @@
-rules_version='2'
-
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2025, 11, 8);
+
+    // ✅ HELPER FUNCTION
+    // Checks the 'role' field in the user's document inside the 'users' collection
+    function isAdmin() {
+      return request.auth != null && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      // Admin can change roles, User can update their own profile
+      allow write: if isAdmin() || request.auth.uid == userId;
+    }
+
+    // 2. Seminar Halls Collection
+    match /seminarHalls/{hallId} {
+      allow read: if request.auth != null;
+      // Only Admins can create/update/delete halls
+      allow write: if isAdmin();
+    }
+
+    // 3. Bookings Collection
+    match /bookings/{bookingId} {
+      // Anyone can create a booking
+      allow create: if request.auth != null;
+      
+      // Users read their own; Admins read all
+      allow read: if isAdmin() || resource.data.requesterId == request.auth.uid;
+      
+      // Users can ONLY cancel; Admins can do anything (approve/reject)
+      allow update: if isAdmin() 
+                    || (resource.data.requesterId == request.auth.uid &&
+                        request.resource.data.status == 'Cancelled');
+      
+      // Only Admin can delete
+      allow delete: if isAdmin();
+    }
+
+    // 4. Notifications Collection
+    match /notifications/{notificationId} {
+      allow read: if request.auth.uid == resource.data.userId;
+      // Admins create notifications (when approving), Users update (when reading)
+      allow create: if isAdmin();
+      allow update: if request.auth.uid == resource.data.userId;
     }
   }
 }
