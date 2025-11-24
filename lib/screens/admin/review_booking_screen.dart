@@ -6,18 +6,10 @@ import 'package:seminar_booking_app/providers/app_state.dart';
 import 'package:seminar_booking_app/widgets/admin/reallocate_dialog.dart';
 import 'package:intl/intl.dart';
 
-class ReviewBookingScreen extends StatefulWidget {
+class ReviewBookingScreen extends StatelessWidget {
   final Booking booking;
   const ReviewBookingScreen({super.key, required this.booking});
 
-  @override
-  State<ReviewBookingScreen> createState() => _ReviewBookingScreenState();
-}
-
-class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
-  bool _isLoading = false;
-
-  /// Shows a dialog forcing the admin to enter a rejection reason.
   void _showRejectionDialog(BuildContext context) {
     final reasonController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -35,7 +27,7 @@ class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
               hintText: 'e.g., Conflicting VIP event',
             ),
             validator: (value) =>
-                value!.trim().isEmpty ? 'A reason is required' : null,
+            value!.trim().isEmpty ? 'A reason is required' : null,
           ),
         ),
         actions: [
@@ -45,40 +37,30 @@ class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: _isLoading
-                ? null
-                : () async {
-                    if (formKey.currentState!.validate()) {
-                      setState(() => _isLoading = true);
-                      try {
-                        await context.read<AppState>().reviewBooking(
-                              bookingId: widget.booking.id, 
-                              newStatus: 'Rejected',
-                              rejectionReason: reasonController.text.trim(),
-                            );
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                await context.read<AppState>().reviewBooking(
+                  bookingId: booking.id,
+                  newStatus: 'Rejected',
+                  rejectionReason: reasonController.text.trim(),
+                );
 
-                        if (Navigator.canPop(dialogContext)) {
-                          Navigator.pop(dialogContext);
-                        }
+                if (Navigator.canPop(dialogContext)) {
+                  Navigator.pop(dialogContext);
+                }
 
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Booking has been rejected.'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                          await Future.delayed(
-                              const Duration(milliseconds: 800));
-                          context.go('/admin/home');
-                        }
-                      } finally {
-                        if (mounted) {
-                          setState(() => _isLoading = false);
-                        }
-                      }
-                    }
-                  },
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Booking has been rejected.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  await Future.delayed(const Duration(milliseconds: 800));
+                  GoRouter.of(context).go('/admin/home');
+                }
+              }
+            },
             child: const Text('Confirm Rejection'),
           ),
         ],
@@ -86,47 +68,30 @@ class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
     );
   }
 
-  /// Finds available halls and shows the new ReallocateDialog
   void _showReallocateDialog(BuildContext context) {
     final appState = context.read<AppState>();
     final allBookings = appState.bookings;
     final allHalls = appState.halls;
 
     final conflictingStart =
-        DateTime.parse('${widget.booking.date} ${widget.booking.startTime}');
+    DateTime.parse('${booking.date} ${booking.startTime}');
     final conflictingEnd =
-        DateTime.parse('${widget.booking.date} ${widget.booking.endTime}');
+    DateTime.parse('${booking.date} ${booking.endTime}');
 
     final availableHalls = allHalls.where((hall) {
-      // --- ✅ START OF FIX ---
-      // We no longer skip the hall the booking is already in.
-      // We only skip halls that are manually set to "unavailable".
-      if (!hall.isAvailable) {
+      if (hall.name == booking.hall || !hall.isAvailable) {
         return false;
       }
-      
       final hasOverlap = allBookings.any((b) {
-        // 1. We skip the booking we are currently moving.
-        if (b.id == widget.booking.id) {
-          return false;
-        }
-
-        // 2. We skip any booking that isn't for this hall
-        //    OR is in a 'Cancelled' or 'Rejected' state.
         if (b.hall != hall.name ||
             (b.status != 'Approved' && b.status != 'Pending')) {
           return false;
         }
-        
-        // 3. We do the time check for all remaining relevant bookings.
         final existingStart = DateTime.parse('${b.date} ${b.startTime}');
         final existingEnd = DateTime.parse('${b.date} ${b.endTime}');
-        
         return conflictingStart.isBefore(existingEnd) &&
             conflictingEnd.isAfter(existingStart);
       });
-      // --- ✅ END OF FIX ---
-      
       return !hasOverlap;
     }).toList();
 
@@ -134,7 +99,6 @@ class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
       return {'name': hall.name, 'capacity': hall.capacity};
     }).toList();
 
-    // --- 2. Show the new dialog ---
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -154,12 +118,12 @@ class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
 
         return ReallocateDialog(
           halls: hallData,
-          selectedHall: null, // Nothing is pre-selected
+          selectedHall: null,
           onReallocate: (String newHallName) async {
-            setState(() => _isLoading = true);
             try {
-              await appState.reviewBooking(
-                bookingId: widget.booking.id,
+               // The updated reviewBooking will throw if there is a conflict in the NEW hall
+               await appState.reviewBooking(
+                bookingId: booking.id,
                 newStatus: 'Approved',
                 newHall: newHallName,
               );
@@ -168,7 +132,7 @@ class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
                 Navigator.pop(dialogContext);
               }
 
-              if (mounted) {
+              if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Hall has been reallocated to $newHallName.'),
@@ -178,10 +142,21 @@ class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
                 await Future.delayed(const Duration(milliseconds: 800));
                 context.go('/admin/home');
               }
-            } finally {
-              if (mounted) {
-                setState(() => _isLoading = false);
-              }
+            } catch (e) {
+               // Catch conflict error from reallocation
+               if (Navigator.canPop(dialogContext)) Navigator.pop(dialogContext);
+               if (context.mounted) {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text("Reallocation Failed"),
+                      content: Text(e.toString().replaceAll("Exception: ", "")),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))
+                      ],
+                    ),
+                  );
+               }
             }
           },
         );
@@ -189,16 +164,10 @@ class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final formattedDate =
-        DateFormat.yMMMMd().format(DateTime.parse(widget.booking.date));
-        
-    final bool isTerminalStatus = widget.booking.status == 'Rejected' ||
-        widget.booking.status == 'Cancelled';
-        
-    final bool isApproved = widget.booking.status == 'Approved';
+    DateFormat.yMMMMd().format(DateTime.parse(booking.date));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Review Request')),
@@ -208,25 +177,25 @@ class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildDetailCard(context, 'Event Details', [
-              _buildDetailRow(context, 'Title', widget.booking.title),
-              _buildDetailRow(context, 'Purpose', widget.booking.purpose),
-              _buildDetailRow(context, 'Attendees',
-                  widget.booking.expectedAttendees.toString()),
-              if (widget.booking.additionalRequirements.isNotEmpty)
-                _buildDetailRow(context, 'Requirements',
-                    widget.booking.additionalRequirements),
+              _buildDetailRow(context, 'Title', booking.title),
+              _buildDetailRow(context, 'Purpose', booking.purpose),
+              _buildDetailRow(
+                  context, 'Attendees', booking.expectedAttendees.toString()),
+              if (booking.additionalRequirements.isNotEmpty)
+                _buildDetailRow(
+                    context, 'Requirements', booking.additionalRequirements),
             ]),
             const SizedBox(height: 16),
             _buildDetailCard(context, 'Schedule & Hall', [
-              _buildDetailRow(context, 'Hall', widget.booking.hall),
+              _buildDetailRow(context, 'Hall', booking.hall),
               _buildDetailRow(context, 'Date', formattedDate),
               _buildDetailRow(
-                  context, 'Time', '${widget.booking.startTime} - ${widget.booking.endTime}'),
+                  context, 'Time', '${booking.startTime} - ${booking.endTime}'),
             ]),
             const SizedBox(height: 16),
             _buildDetailCard(context, 'Requester Information', [
-              _buildDetailRow(context, 'Name', widget.booking.requestedBy),
-              _buildDetailRow(context, 'Department', widget.booking.department),
+              _buildDetailRow(context, 'Name', booking.requestedBy),
+              _buildDetailRow(context, 'Department', booking.department),
             ]),
           ],
         ),
@@ -243,9 +212,7 @@ class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
                 label: const Text('Re-allocate'),
                 style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12)),
-                onPressed: _isLoading || isTerminalStatus
-                    ? null
-                    : () => _showReallocateDialog(context),
+                onPressed: () => _showReallocateDialog(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -260,9 +227,7 @@ class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
                       foregroundColor: Colors.red,
                       side: const BorderSide(color: Colors.red),
                     ),
-                    onPressed: _isLoading || isTerminalStatus
-                        ? null
-                        : () => _showRejectionDialog(context),
+                    onPressed: () => _showRejectionDialog(context),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -273,32 +238,39 @@ class _ReviewBookingScreenState extends State<ReviewBookingScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                     ),
-                    onPressed: _isLoading || isTerminalStatus || isApproved
-                        ? null
-                        : () async {
-                            setState(() => _isLoading = true);
-                            try {
-                              await context.read<AppState>().reviewBooking(
-                                  bookingId: widget.booking.id,
-                                  newStatus: 'Approved');
+                    // ✅ UPDATED APPROVE BUTTON LOGIC
+                    onPressed: () async {
+                      try {
+                        await context
+                            .read<AppState>()
+                            .reviewBooking(bookingId: booking.id, newStatus: 'Approved');
 
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Booking has been approved.'),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
-                                await Future.delayed(
-                                    const Duration(milliseconds: 800));
-                                context.go('/admin/home');
-                              }
-                            } finally {
-                              if (mounted) {
-                                setState(() => _isLoading = false);
-                              }
-                            }
-                          },
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Booking has been approved.'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          await Future.delayed(const Duration(milliseconds: 800));
+                          context.go('/admin/home');
+                        }
+                      } catch (e) {
+                        // ❌ Conflict or Error Caught Here
+                        if (context.mounted) {
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text("Conflict Detected"),
+                              content: Text(e.toString().replaceAll("Exception: ", "")),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))
+                              ],
+                            ),
+                          );
+                        }
+                      }
+                    },
                   ),
                 ),
               ],

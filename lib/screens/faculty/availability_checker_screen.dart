@@ -22,12 +22,13 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
 
   TimeOfDay? _selectedStartTime;
   TimeOfDay? _selectedEndTime;
+  
+  Booking? _conflictingBooking; // To store the blocking booking
 
-  final int _openingHour = 8; // 8:00 AM
-  final int _closingHour = 18; // 6:00 PM (18:00)
+  final int _openingHour = 8; 
+  final int _closingHour = 18; 
   String? _validationError;
 
-  // --- (Helper functions: _getEventsForDay, _parseTime - Unchanged) ---
   List<Booking> _getEventsForDay(DateTime day, List<Booking> allBookings) {
     return allBookings
         .where((booking) =>
@@ -48,7 +49,6 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
     }
   }
 
-  // --- (Helper functions: _generate...TimeSlots - Unchanged) ---
   List<TimeOfDay> _generateStartTimeSlots() {
     List<TimeOfDay> slots = [];
     for (int hour = _openingHour; hour < _closingHour; hour++) {
@@ -64,40 +64,7 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
     }
     return slots;
   }
-
-  // --- (Helper function: _isSlotRangeValid - Unchanged) ---
-  bool _isSlotRangeValid() {
-    if (_selectedDay == null || _selectedStartTime == null || _selectedEndTime == null) {
-      setState(() => _validationError = 'Please select a start and end time.');
-      return false;
-    }
-    
-    final allBookings = context.read<AppState>().bookings;
-    final todaysBookings = _getEventsForDay(_selectedDay!, allBookings);
-
-    final proposedStart = _selectedDay!
-        .add(Duration(hours: _selectedStartTime!.hour, minutes: _selectedStartTime!.minute));
-    final proposedEnd = _selectedDay!
-        .add(Duration(hours: _selectedEndTime!.hour, minutes: _selectedEndTime!.minute));
-
-    for (final booking in todaysBookings) {
-      final existingStart =
-          DateTime.parse(booking.date).add(_parseTime(booking.startTime));
-      final existingEnd =
-          DateTime.parse(booking.date).add(_parseTime(booking.endTime));
-
-      if (proposedStart.isBefore(existingEnd) &&
-          proposedEnd.isAfter(existingStart)) {
-        setState(() => _validationError = 'This time range conflicts with an existing booking.');
-        return false;
-      }
-    }
-    
-    setState(() => _validationError = null);
-    return true;
-  }
-
-  // --- (Time Formatters - Unchanged) ---
+  
   String _formatTime(TimeOfDay time) {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
@@ -110,13 +77,42 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
     return '$startHour:00 - $endHour:00';
   }
 
-  // --- (onConfirmAndRequest - Unchanged) ---
+  // ✅ NEW: Real-time conflict check
+  void _checkConflicts() {
+    if (_selectedDay == null || _selectedStartTime == null || _selectedEndTime == null) {
+      setState(() {
+        _conflictingBooking = null;
+        _validationError = null;
+      });
+      return;
+    }
+
+    final appState = context.read<AppState>();
+    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDay!);
+    final startTimeStr = _formatTime(_selectedStartTime!);
+    final endTimeStr = _formatTime(_selectedEndTime!);
+
+    // Get the actual booking object if there is a conflict
+    final conflict = appState.getConflictingBooking(
+        widget.hall.name, dateStr, startTimeStr, endTimeStr);
+
+    setState(() {
+      _conflictingBooking = conflict;
+      if (conflict != null) {
+        _validationError = null; // Conflict takes precedence
+      }
+    });
+  }
+
   void _onConfirmAndRequest() {
-    if (_isSlotRangeValid()) {
+    // Double check
+    if (_conflictingBooking != null) return;
+
+    if (_selectedDay != null && _selectedStartTime != null && _selectedEndTime != null) {
       final hallId = widget.hall.id;
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDay!);
-      final startTimeStr = '${_selectedStartTime!.hour}:${_selectedStartTime!.minute}';
-      final endTimeStr = '${_selectedEndTime!.hour}:${_selectedEndTime!.minute}';
+      final startTimeStr = _formatTime(_selectedStartTime!);
+      final endTimeStr = _formatTime(_selectedEndTime!);
 
       final path = '/booking/form'
           '?hallId=$hallId'
@@ -128,22 +124,17 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
     }
   }
 
-  // --- ✅ 1. 'withOpacity' FIXED HERE ---
-  /// Returns the correct background color for a day based on bookings
   Color _getDayColor(DateTime day, List<Booking> allBookings) {
     final events = _getEventsForDay(day, allBookings);
-    
-    // (0.8 * 255).round() = 204
     if (events.length > 2) {
-      return Colors.red.shade400.withAlpha(204); // Heavily Booked
+      return Colors.red.shade400.withAlpha(204); 
     }
-    if (events.isNotEmpty) {
-      return Colors.orange.shade400.withAlpha(204); // Partially Booked
+    if (events.length > 0) {
+      return Colors.orange.shade400.withAlpha(204); 
     }
-    return Colors.green.shade400.withAlpha(204); // Available
+    return Colors.green.shade400.withAlpha(204); 
   }
 
-  /// Builds the small legend item
   Widget _buildLegendItem(Color color, String text) {
     return Row(
       children: [
@@ -161,7 +152,6 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
     );
   }
 
-  /// Builds the custom cell for the calendar
   Widget _buildDayCell({
     required DateTime day,
     required Color backgroundColor,
@@ -213,6 +203,30 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // ✅ HALL BLOCKED WARNING
+            if (!widget.hall.isAvailable)
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.block, color: Colors.red.shade700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        "This hall is currently blocked by the Admin for maintenance or other reasons.",
+                        style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             Text('Check Availability for ${widget.hall.name}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Card(
@@ -232,6 +246,7 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
                     _selectedStartTime = null; 
                     _selectedEndTime = null;
                     _validationError = null;
+                    _conflictingBooking = null; // Reset conflict
                   });
                 },
                 enabledDayPredicate: (day) {
@@ -251,16 +266,14 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
                   outsideBuilder: (context, day, focusedDay) {
                     return _buildDayCell(
                       day: day,
-                      // ✅ 'withOpacity' FIXED HERE
-                      backgroundColor: Colors.grey.shade800.withAlpha(128), // ~0.5
+                      backgroundColor: Colors.grey.shade800.withAlpha(128),
                       textColor: Colors.grey.shade400,
                     );
                   },
                   disabledBuilder: (context, day, focusedDay) {
                     return _buildDayCell(
                       day: day,
-                      // ✅ 'withOpacity' FIXED HERE
-                      backgroundColor: Colors.grey.shade900.withAlpha(128), // ~0.5
+                      backgroundColor: Colors.grey.shade900.withAlpha(128),
                       textColor: Colors.grey.shade700,
                     );
                   },
@@ -291,8 +304,7 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
                         borderRadius: BorderRadius.circular(8.0),
                         boxShadow: [
                           BoxShadow(
-                            // ✅ 'withOpacity' FIXED HERE
-                            color: theme.primaryColor.withAlpha(128), // ~0.5
+                            color: theme.primaryColor.withAlpha(128),
                             blurRadius: 5,
                             spreadRadius: 1,
                           )
@@ -304,7 +316,6 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
               ),
             ),
             
-            // --- ✅ 2. 'withOpacity' FIXED HERE ---
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
               child: Row(
@@ -319,13 +330,12 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
             const Divider(),
             const SizedBox(height: 16),
 
-            // --- TIME SELECTION ---
             if (_selectedDay != null) ...[
               Text('2. Select a Time Range', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 16),
               
               DropdownButtonFormField<TimeOfDay>(
-                initialValue: _selectedStartTime,
+                value: _selectedStartTime,
                 hint: const Text('Select start time'),
                 decoration: const InputDecoration(
                   labelText: 'Start Time',
@@ -342,13 +352,14 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
                     _selectedStartTime = value;
                     _selectedEndTime = null;
                     _validationError = null;
+                    _conflictingBooking = null;
                   });
                 },
               ),
               const SizedBox(height: 16),
 
               DropdownButtonFormField<TimeOfDay>(
-                initialValue: _selectedEndTime,
+                value: _selectedEndTime,
                 hint: const Text('Select end time'),
                 decoration: const InputDecoration(
                   labelText: 'End Time',
@@ -364,20 +375,60 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
                 onChanged: (value) {
                   setState(() {
                     _selectedEndTime = value;
-                    _validationError = null;
                   });
+                  // ✅ Trigger check immediately on selection
+                  _checkConflicts();
                 },
               ),
               const SizedBox(height: 24),
               
+              // ✅ CONFLICT WARNING BOX
+              if (_conflictingBooking != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    border: Border.all(color: Colors.red),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text("Time Conflict!", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        // Show who booked it and when
+                        "This slot is already booked:\nFrom: ${_conflictingBooking!.startTime} To: ${_conflictingBooking!.endTime}",
+                        style: const TextStyle(color: Colors.black87, fontSize: 14),
+                      ),
+                      if (_conflictingBooking!.requestedBy.isNotEmpty)
+                         Text(
+                          "By: ${_conflictingBooking!.requestedBy}",
+                          style: const TextStyle(color: Colors.black87, fontSize: 14, fontStyle: FontStyle.italic),
+                        ),
+                    ],
+                  ),
+                ),
+
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  // Disable if hall is blocked OR double booked
+                  backgroundColor: (widget.hall.isAvailable && _conflictingBooking == null && _selectedEndTime != null) 
+                      ? null 
+                      : Colors.grey,
                 ),
-                onPressed: _selectedDay == null || _selectedStartTime == null || _selectedEndTime == null
-                  ? null
-                  : _onConfirmAndRequest,
+                onPressed: (widget.hall.isAvailable && _conflictingBooking == null && _selectedEndTime != null)
+                  ? _onConfirmAndRequest
+                  : null,
                 child: const Text('Confirm & Request'),
               ),
 

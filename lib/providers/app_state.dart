@@ -1,5 +1,3 @@
-// lib/providers/app_state.dart
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:seminar_booking_app/services/auth_service.dart';
@@ -149,7 +147,7 @@ class AppState with ChangeNotifier {
     
     await firestoreService.updateUserProfile(_currentUser!.uid, updateData);
 
-    // Manually update local state to fix restart bug
+    // Manually update local state
     _currentUser = User(
       uid: _currentUser!.uid,
       email: _currentUser!.email,
@@ -165,10 +163,8 @@ class AppState with ChangeNotifier {
   }
 
   Future<String?> updateUserRole(String uid, String newRole) async {
-    // This now calls the simple Firestore write
     final error = await firestoreService.changeUserRole(uid: uid, newRole: newRole);
     if (error == null) {
-      // Manually update local user list
       final userIndex = _allUsers.indexWhere((u) => u.uid == uid);
       if (userIndex != -1) {
         _allUsers[userIndex] = User(
@@ -187,7 +183,48 @@ class AppState with ChangeNotifier {
     return error;
   }
 
+  // --- ✅ NEW: Helper to find WHO is blocking the slot ---
+  Booking? getConflictingBooking(String hallName, String date, String startTime, String endTime, {String? excludeBookingId}) {
+    try {
+      final requestStart = DateTime.parse('$date $startTime');
+      final requestEnd = DateTime.parse('$date $endTime');
+
+      // Filter for relevant "Approved" bookings
+      final relevantBookings = _bookings.where((b) {
+        // Exclude current booking if editing/reviewing
+        if (excludeBookingId != null && b.id == excludeBookingId) return false;
+        
+        return b.hall == hallName &&
+               b.date == date &&
+               b.status == 'Approved'; // Only check against CONFIRMED bookings
+      }).toList();
+
+      for (var existing in relevantBookings) {
+        final existingStart = DateTime.parse('${existing.date} ${existing.startTime}');
+        final existingEnd = DateTime.parse('${existing.date} ${existing.endTime}');
+
+        // Check overlap: (StartA < EndB) and (EndA > StartB)
+        if (requestStart.isBefore(existingEnd) && requestEnd.isAfter(existingStart)) {
+          return existing; // Return the specific booking that blocks us
+        }
+      }
+    } catch (e) {
+      print("Error checking conflict: $e");
+    }
+    return null; // No conflict found
+  }
+
+  // Helper that just returns true/false
+  bool checkBookingConflict(String hallName, String date, String startTime, String endTime, {String? excludeBookingId}) {
+    return getConflictingBooking(hallName, date, startTime, endTime, excludeBookingId: excludeBookingId) != null;
+  }
+
+  // ✅ UPDATED: Checks conflict before submitting
   Future<void> submitBooking(Booking booking) async {
+    // Check for conflicts against existing Approved bookings
+    if (checkBookingConflict(booking.hall, booking.date, booking.startTime, booking.endTime)) {
+      throw Exception("This time slot is already booked! Please choose another time.");
+    }
     await firestoreService.addBooking(booking);
   }
 
@@ -195,6 +232,7 @@ class AppState with ChangeNotifier {
     await firestoreService.cancelBooking(bookingId);
   }
 
+  // ✅ UPDATED: Checks conflict before Approving
   Future<void> reviewBooking({
     required String bookingId,
     required String newStatus,
@@ -210,14 +248,26 @@ class AppState with ChangeNotifier {
     if (newHall != null) {
       updateData['hall'] = newHall;
     }
+
+    // 1. If Approving, check for conflicts
+    if (newStatus == 'Approved') {
+      final booking = _bookings.firstWhere((b) => b.id == bookingId);
+      // Use the new hall if re-allocating, otherwise the original hall
+      final targetHall = newHall ?? booking.hall; 
+      
+      if (checkBookingConflict(targetHall, booking.date, booking.startTime, booking.endTime, excludeBookingId: bookingId)) {
+         throw Exception("Cannot approve! This overlaps with another APPROVED event.");
+      }
+    }
     
+    // 2. Update in Firestore
     await firestoreService.updateBooking(bookingId, updateData);
 
-    // Manually create notification
+    // 3. Manually create notification
     if (newStatus == 'Approved' || newStatus == 'Rejected') {
       final booking = _bookings.firstWhereOrNull((b) => b.id == bookingId);
       if (booking != null) {
-        final title = "Booking $newStatus!";
+        final title = "Booking ${newStatus}!";
         String body = "Your request for '${booking.title}' has been ${newStatus.toLowerCase()}.";
         if(newStatus == 'Approved' && newHall != null) {
           body += " It has been re-allocated to $newHall.";

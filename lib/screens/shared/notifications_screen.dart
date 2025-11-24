@@ -21,9 +21,46 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     });
   }
 
+  // --- ✅ NEW: Helper to determine color and icon based on content ---
+  Map<String, dynamic> _getNotificationStyle(String title, String body) {
+    final String combined = '$title $body'.toLowerCase();
+
+    if (combined.contains('approved')) {
+      return {
+        'color': Colors.green.shade700,
+        'bgColor': Colors.green.shade50,
+        'icon': Icons.check_circle_outline,
+      };
+    } else if (combined.contains('rejected') || combined.contains('cancelled')) {
+      return {
+        'color': Colors.red.shade700,
+        'bgColor': Colors.red.shade50,
+        'icon': Icons.cancel_outlined,
+      };
+    } else if (combined.contains('re-allocated') || combined.contains('reallocated')) {
+      return {
+        'color': Colors.blue.shade700,
+        'bgColor': Colors.blue.shade50,
+        'icon': Icons.swap_horiz_outlined,
+      };
+    } else if (combined.contains('new request') || combined.contains('submitted')) {
+      return {
+        'color': Colors.orange.shade800,
+        'bgColor': Colors.orange.shade50,
+        'icon': Icons.assignment_outlined,
+      };
+    }
+    // Default style
+    return {
+      'color': Colors.grey.shade800,
+      'bgColor': Colors.white,
+      'icon': Icons.notifications_outlined,
+    };
+  }
+  // --- END NEW ---
+
   @override
   Widget build(BuildContext context) {
-    // Use 'watch' to get the list and rebuild when it changes
     final notifications = context.watch<AppState>().notifications;
 
     return Scaffold(
@@ -43,54 +80,60 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             )
           : ListView.builder(
               itemCount: notifications.length,
+              padding: const EdgeInsets.all(8),
               itemBuilder: (context, index) {
                 final notification = notifications[index];
                 
-                // --- CORRECTED ---
-                // Use the non-nullable fields directly from your model
                 final title = notification.title;
                 final body = notification.body;
                 final timestamp = notification.timestamp;
                 final bool hasBookingId = notification.bookingId != null &&
                     notification.bookingId!.isNotEmpty;
-                // --- END CORRECTED ---
+
+                // Get style based on text
+                final style = _getNotificationStyle(title, body);
 
                 return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  elevation: 0, // Flat style for cleaner colored look
+                  color: style['bgColor'], // Light background color
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: style['color'].withOpacity(0.2)),
+                  ),
+                  margin: const EdgeInsets.symmetric(vertical: 6),
                   child: ListTile(
-                    // A faded icon for read, a bright one for unread
-                    leading: Icon(
-                      notification.isRead
-                          ? Icons.notifications_none
-                          : Icons.notifications_active,
-                      color: notification.isRead
-                          ? Colors.grey
-                          : Theme.of(context).primaryColor,
+                    leading: CircleAvatar(
+                      backgroundColor: style['color'].withOpacity(0.1),
+                      child: Icon(
+                        style['icon'],
+                        color: style['color'],
+                      ),
                     ),
                     title: Text(
                       title,
                       style: TextStyle(
-                        fontWeight:
-                            notification.isRead ? FontWeight.normal : FontWeight.bold,
+                        fontWeight: FontWeight.bold,
+                        color: style['color'], // Colored title
                       ),
                     ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(body),
                         const SizedBox(height: 4),
+                        Text(body, style: const TextStyle(color: Colors.black87)),
+                        const SizedBox(height: 6),
                         Text(
                           DateFormat.yMMMd().add_jm().format(timestamp),
-                          style: Theme.of(context).textTheme.bodySmall,
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                         ),
                       ],
                     ),
                     isThreeLine: true,
-                    // Allow tapping to go to the booking
+                    // Show arrow if clickable
+                    trailing: hasBookingId ? Icon(Icons.chevron_right, color: style['color']) : null,
                     onTap: hasBookingId
                         ? () {
-                            context
-                                .go('/booking/details/${notification.bookingId}');
+                            context.push('/booking/details/${notification.bookingId}');
                           }
                         : null,
                   ),

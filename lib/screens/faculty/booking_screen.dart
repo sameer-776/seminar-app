@@ -9,8 +9,7 @@ class BookingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
-    final availableHalls =
-        appState.halls.where((hall) => hall.isAvailable).toList();
+    final availableHalls = appState.halls; // We show ALL halls, but indicate if blocked inside
 
     return Scaffold(
       appBar: AppBar(
@@ -22,7 +21,7 @@ class BookingScreen extends StatelessWidget {
               child: Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Text(
-                  "There are currently no seminar halls available for booking. Please check back later.",
+                  "There are currently no seminar halls listed.",
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16, color: Colors.grey),
                 ),
@@ -42,13 +41,10 @@ class BookingScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: InkWell(
-                    
-                    // --- ✅ THIS IS THE FIX ---
+                    // ✅ FIX: Use push to keep navigation history
                     onTap: () {
-                      // Use context.push() to add to the navigation stack
                       context.push('/booking/availability/${hall.id}');
                     },
-                    // --- END OF FIX ---
                     
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -88,12 +84,28 @@ class BookingScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                hall.name,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    hall.name,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                  // ✅ Visual indicator if blocked
+                                  if (!hall.isAvailable)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.red.shade200)
+                                      ),
+                                      child: Text("BLOCKED", style: TextStyle(fontSize: 10, color: Colors.red.shade800, fontWeight: FontWeight.bold)),
+                                    )
+                                ],
                               ),
                               const SizedBox(height: 8),
                               if (hall.description.isNotEmpty)

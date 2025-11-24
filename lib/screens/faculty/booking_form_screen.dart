@@ -5,14 +5,12 @@ import 'package:intl/intl.dart';
 import 'package:seminar_booking_app/models/booking.dart';
 import 'package:seminar_booking_app/models/seminar_hall.dart';
 import 'package:seminar_booking_app/providers/app_state.dart';
+import 'package:seminar_booking_app/services/firestore_service.dart';
 
 class BookingFormScreen extends StatefulWidget {
   final SeminarHall hall;
   final DateTime date;
   final TimeOfDay startTime;
-  
-  // --- UPDATED ---
-  // Replaced 'duration' with 'endTime'
   final TimeOfDay endTime; 
 
   const BookingFormScreen({
@@ -20,7 +18,7 @@ class BookingFormScreen extends StatefulWidget {
     required this.hall,
     required this.date,
     required this.startTime,
-    required this.endTime, // Use endTime
+    required this.endTime,
   });
 
   @override
@@ -35,6 +33,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   final _requirementsController = TextEditingController();
   bool _isLoading = false;
 
+  String _formatTime(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
   Future<void> _submitRequest() async {
     FocusScope.of(context).unfocus();
     
@@ -42,6 +44,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       setState(() => _isLoading = true);
       
       final appState = context.read<AppState>();
+      final firestoreService = context.read<FirestoreService>();
       final currentUser = appState.currentUser;
 
       if (currentUser == null) {
@@ -50,20 +53,17 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
         return;
       }
       
-      // --- UPDATED ---
-      // No need to calculate end time; it's passed directly.
-      // We just need to format the TimeOfDay objects.
-      final formattedStartTime = '${widget.startTime.hour.toString().padLeft(2, '0')}:${widget.startTime.minute.toString().padLeft(2, '0')}';
-      final formattedEndTime = '${widget.endTime.hour.toString().padLeft(2, '0')}:${widget.endTime.minute.toString().padLeft(2, '0')}';
+      final formattedStartTime = _formatTime(widget.startTime);
+      final formattedEndTime = _formatTime(widget.endTime);
 
       final newBooking = Booking(
-        id: '',
+        id: '', 
         title: _titleController.text.trim(),
         purpose: _purposeController.text.trim(),
         hall: widget.hall.name,
         date: DateFormat('yyyy-MM-dd').format(widget.date),
-        startTime: formattedStartTime, // Use formatted start time
-        endTime: formattedEndTime,   // Use formatted end time
+        startTime: formattedStartTime,
+        endTime: formattedEndTime,
         status: 'Pending',
         requestedBy: currentUser.name,
         requesterId: currentUser.uid,
@@ -73,21 +73,46 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
         rejectionReason: null,
       );
 
-      await appState.submitBooking(newBooking);
+      try {
+        // 1. Submit the booking (This will throw if there is a conflict)
+        await appState.submitBooking(newBooking);
 
-      if (mounted) {
-        // ✅ NAVIGATE TO THE NEW CONFIRMATION SCREEN
-        context.go('/booking/confirmation');
+        // 2. Manually Notify Admins
+        // Fetch all users to find admins (quickest way without Cloud Functions)
+        final allUsersStream = firestoreService.getAllUsers();
+        final allUsers = await allUsersStream.first;
+        final admins = allUsers.where((u) => u.role == 'admin').toList();
+
+        for (var admin in admins) {
+          await firestoreService.createNotification(
+            userId: admin.uid,
+            title: 'New Booking Request',
+            body: '${currentUser.name} has requested ${widget.hall.name}.',
+            bookingId: null, 
+          );
+        }
+
+        if (mounted) {
+          // Success! Go to confirmation
+          context.go('/booking/confirmation');
+        }
+      } catch (e) {
+        // ❌ Conflict or Error Caught Here
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll("Exception: ", "")),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
   
-  // --- UPDATED ---
-  // Helper to format TimeOfDay to a readable string (e.g., "11:00")
-  String _formatTime(TimeOfDay time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -99,7 +124,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // This summary card will now show the start and end time
               _buildSummaryCard(),
               const SizedBox(height: 24),
               TextFormField(controller: _titleController, decoration: const InputDecoration(labelText: 'Event Title', border: OutlineInputBorder()), validator: (v) => v!.isEmpty ? 'This field is required' : null),
@@ -134,12 +158,8 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     );
   }
 
-
   Widget _buildSummaryCard() {
     final formattedDate = DateFormat.yMMMMd().format(widget.date);
-    
-    // --- UPDATED ---
-    // Format both start and end times
     final formattedStartTime = _formatTime(widget.startTime);
     final formattedEndTime = _formatTime(widget.endTime);
 
@@ -155,8 +175,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
             const SizedBox(height: 8),
             _buildSummaryRow(icon: Icons.calendar_today_outlined, text: formattedDate),
             const SizedBox(height: 8),
-            // --- UPDATED ---
-            // Display the time range
             _buildSummaryRow(icon: Icons.access_time_outlined, text: 'Time: $formattedStartTime - $formattedEndTime'),
           ],
         ),

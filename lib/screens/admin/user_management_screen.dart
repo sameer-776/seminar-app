@@ -33,9 +33,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     _searchController.dispose();
     super.dispose();
   }
-
-  // This feature is disabled on the free plan as it requires Cloud Functions
-  // to delete the Auth user.
+  
   void _showDeleteConfirmationDialog(BuildContext context, User user) {
      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
