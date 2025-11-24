@@ -29,40 +29,37 @@ class BookingScreen extends StatelessWidget {
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.all(12.0), // Added padding
+              padding: const EdgeInsets.all(12.0),
               itemCount: availableHalls.length,
               itemBuilder: (context, index) {
                 final hall = availableHalls[index];
 
-                // --- NEW VISUAL CARD ---
                 return Card(
-                  clipBehavior: Clip.antiAlias, // Clips the image to the card's shape
+                  clipBehavior: Clip.antiAlias,
                   margin: const EdgeInsets.symmetric(vertical: 8.0),
                   elevation: 2,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: InkWell(
-                    // Makes the whole card tappable
                     
-                    // --- UPDATED ONTAP ---
+                    // --- ✅ THIS IS THE FIX ---
                     onTap: () {
-                      // Navigate using the Hall ID in the path
-                      context.go('/booking/availability/${hall.id}');
+                      // Use context.push() to add to the navigation stack
+                      context.push('/booking/availability/${hall.id}');
                     },
-                    // --- END UPDATED ONTAP ---
+                    // --- END OF FIX ---
                     
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // --- IMAGE SECTION ---
                         SizedBox(
-                          height: 150, // Give the image a fixed height
+                          height: 150,
                           child: hall.imageUrl.isNotEmpty
                               ? Image.network(
                                   hall.imageUrl,
                                   fit: BoxFit.cover,
-                                  // Loading and error builders for better UX
                                   loadingBuilder: (context, child, progress) {
                                     return progress == null
                                         ? child
@@ -77,7 +74,6 @@ class BookingScreen extends StatelessWidget {
                                   },
                                 )
                               : Container(
-                                  // Placeholder if no image
                                   color: Colors.grey.shade300,
                                   child: const Center(
                                     child: Icon(Icons.business_outlined,
@@ -100,7 +96,6 @@ class BookingScreen extends StatelessWidget {
                                     ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 8),
-                              // Show description if it exists
                               if (hall.description.isNotEmpty)
                                 Text(
                                   hall.description,
@@ -109,12 +104,10 @@ class BookingScreen extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               const SizedBox(height: 12),
-                              // --- CAPACITY & PROCEED ---
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  // Capacity Chip
                                   Chip(
                                     avatar: const Icon(Icons.people_outline,
                                         size: 18),
@@ -123,7 +116,6 @@ class BookingScreen extends StatelessWidget {
                                         .colorScheme
                                         .surfaceContainerHighest,
                                   ),
-                                  // "Select" text with icon
                                   const Row(
                                     children: [
                                       Text(
@@ -143,7 +135,6 @@ class BookingScreen extends StatelessWidget {
                     ),
                   ),
                 );
-                // --- END OF NEW CARD ---
               },
             ),
     );

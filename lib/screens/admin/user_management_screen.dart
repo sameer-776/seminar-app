@@ -1,3 +1,5 @@
+// lib/screens/admin/user_management_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:seminar_booking_app/models/user.dart';
@@ -32,66 +34,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     super.dispose();
   }
 
+  // This feature is disabled on the free plan as it requires Cloud Functions
+  // to delete the Auth user.
   void _showDeleteConfirmationDialog(BuildContext context, User user) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Confirm Deletion'),
-        content: Text(
-          'Are you sure you want to permanently delete the user ${user.name}? This action cannot be undone.',
+     ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User deletion is not supported in this version.'),
+          backgroundColor: Colors.grey,
         ),
-        actions: [
-          TextButton(
-            child: const Text('Cancel'),
-            onPressed: () => Navigator.of(dialogContext).pop(),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete User'),
-            onPressed: () async {
-              final authService = context.read<AuthService>();
-              String? error;
-
-              try {
-                error = await authService.deleteUserByAdmin(uid: user.uid);
-
-                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-
-                if (context.mounted) {
-                  if(error == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('User ${user.name} deleted successfully.'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error deleting user: $error'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              } catch (e) {
-                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error deleting user: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-          ),
-        ],
-      ),
-    );
+      );
   }
 
+  // This function is for email/password accounts, but good to keep.
   void _sendPasswordReset(BuildContext context, User user) async {
     final authService = context.read<AuthService>();
     String? error;
@@ -127,7 +81,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     }
   }
 
-  // --- ✅ THIS DIALOG IS NOW FIXED ---
+  // --- ✅ THIS DIALOG IS NOW FIXED to correctly report errors ---
   void _showChangeRoleDialog(BuildContext context, User user) {
     showDialog(
       context: context,
@@ -161,46 +115,27 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   child: const Text('Save'),
                   onPressed: () async {
                     final appState = context.read<AppState>();
-                    String? error; // Variable to hold potential error message
+                    
+                    // This now calls the simple Firestore write
+                    String? error = await appState.updateUserRole(user.uid, selectedRole); 
 
-                    try {
-                      // ✅ Check the return value
-                      error = await appState.updateUserRole(user.uid, selectedRole);
-
-                      if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop();
-                      }
-
-                      if (context.mounted) {
-                        // ✅ Check if error is null
-                        if (error == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Role for ${user.name} updated to $selectedRole.',
-                              ),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        } else {
-                          // ✅ Show the error message returned from the function
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error updating role: $error'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-                    } catch (e) {
-                      // This catches unexpected exceptions (e.g., network error)
-                      if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop();
-                      }
-                      if (context.mounted) {
+                    if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                    
+                    if (context.mounted) {
+                      // ✅ Check if the error is null or not
+                      if (error == null) {
+                        // Success!
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('An unexpected error occurred: $e'),
+                            content: Text('Role for ${user.name} updated to $selectedRole.'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } else {
+                        // Failure! Show the real error.
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error updating role: $error'),
                             backgroundColor: Colors.red,
                           ),
                         );
@@ -334,21 +269,20 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         ),
         subtitle: Text(user.email),
         trailing: isSelf
-            ? null
+            ? null // No menu for self
             : PopupMenuButton<String>(
           onSelected: (value) {
             switch (value) {
               case 'reset_password':
                 _sendPasswordReset(context, user);
                 break;
-              case 'delete_user':
-                _showDeleteConfirmationDialog(context, user);
-                break;
+              // ✅ "delete_user" case is removed
               case 'change_role':
                 _showChangeRoleDialog(context, user);
                 break;
             }
           },
+          // ✅ "Delete User" option is removed
           itemBuilder: (context) => [
             const PopupMenuItem(
               value: 'reset_password',
@@ -360,14 +294,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 user.role == 'admin'
                     ? 'Demote to Faculty'
                     : 'Promote to Admin',
-              ),
-            ),
-            const PopupMenuDivider(),
-            const PopupMenuItem(
-              value: 'delete_user',
-              child: Text(
-                'Delete User',
-                style: TextStyle(color: Colors.red),
               ),
             ),
           ],

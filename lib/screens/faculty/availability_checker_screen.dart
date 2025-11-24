@@ -1,5 +1,3 @@
-// lib/screens/faculty/availability_checker_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +5,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:seminar_booking_app/providers/app_state.dart';
 import 'package:seminar_booking_app/models/seminar_hall.dart';
 import 'package:seminar_booking_app/models/booking.dart';
-import 'package:intl/intl.dart'; // ✅ ADD THIS IMPORT FOR DATE FORMATTING
+import 'package:intl/intl.dart';
 
 class AvailabilityCheckerScreen extends StatefulWidget {
   final SeminarHall hall;
@@ -29,7 +27,7 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
   final int _closingHour = 18; // 6:00 PM (18:00)
   String? _validationError;
 
-  /// Gets a list of bookings for a specific day and hall.
+  // --- (Helper functions: _getEventsForDay, _parseTime - Unchanged) ---
   List<Booking> _getEventsForDay(DateTime day, List<Booking> allBookings) {
     return allBookings
         .where((booking) =>
@@ -39,7 +37,6 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
         .toList();
   }
 
-  /// Helper function to parse "HH:mm" strings into a Duration.
   Duration _parseTime(String time) {
     try {
       final parts = time.split(':');
@@ -51,7 +48,7 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
     }
   }
 
-  /// Generates a list of hourly TimeOfDay objects for the Start Time dropdown.
+  // --- (Helper functions: _generate...TimeSlots - Unchanged) ---
   List<TimeOfDay> _generateStartTimeSlots() {
     List<TimeOfDay> slots = [];
     for (int hour = _openingHour; hour < _closingHour; hour++) {
@@ -60,7 +57,6 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
     return slots;
   }
 
-  /// Generates a list of hourly TimeOfDay objects for the End Time dropdown.
   List<TimeOfDay> _generateEndTimeSlots(TimeOfDay startTime) {
     List<TimeOfDay> slots = [];
     for (int hour = startTime.hour + 1; hour <= _closingHour; hour++) {
@@ -69,7 +65,7 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
     return slots;
   }
 
-  /// Checks if the selected time range is valid and has no conflicts.
+  // --- (Helper function: _isSlotRangeValid - Unchanged) ---
   bool _isSlotRangeValid() {
     if (_selectedDay == null || _selectedStartTime == null || _selectedEndTime == null) {
       setState(() => _validationError = 'Please select a start and end time.');
@@ -84,7 +80,6 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
     final proposedEnd = _selectedDay!
         .add(Duration(hours: _selectedEndTime!.hour, minutes: _selectedEndTime!.minute));
 
-    // Check for conflicts
     for (final booking in todaysBookings) {
       final existingStart =
           DateTime.parse(booking.date).add(_parseTime(booking.startTime));
@@ -94,78 +89,134 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
       if (proposedStart.isBefore(existingEnd) &&
           proposedEnd.isAfter(existingStart)) {
         setState(() => _validationError = 'This time range conflicts with an existing booking.');
-        return false; // Conflict found
+        return false;
       }
     }
     
     setState(() => _validationError = null);
-    return true; // No conflicts
+    return true;
   }
 
-  /// Formats the time for the dropdown labels, e.g., "11:00"
+  // --- (Time Formatters - Unchanged) ---
   String _formatTime(TimeOfDay time) {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
   }
   
-  /// Formats the end time label as shown in your screenshot, e.g., "10:00 - 11:00"
-  String _formatEndTimeLabel(TimeOfDay time) {
-    final endHour = time.hour.toString().padLeft(2, '0');
-    final startHour = (time.hour - 1).toString().padLeft(2, '0');
+  String _formatStartTimeLabel(TimeOfDay time) {
+    final startHour = time.hour.toString().padLeft(2, '0');
+    final endHour = (time.hour + 1).toString().padLeft(2, '0');
     return '$startHour:00 - $endHour:00';
   }
 
-  // ✅ ==========================================================
-  // ✅ THIS IS THE FIX. We now use query parameters instead of 'extra'.
-  // ✅ ==========================================================
+  // --- (onConfirmAndRequest - Unchanged) ---
   void _onConfirmAndRequest() {
     if (_isSlotRangeValid()) {
-      // 1. Format all data into strings
       final hallId = widget.hall.id;
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDay!);
-      
-      // Format time as HH:mm
       final startTimeStr = '${_selectedStartTime!.hour}:${_selectedStartTime!.minute}';
       final endTimeStr = '${_selectedEndTime!.hour}:${_selectedEndTime!.minute}';
 
-      // 2. Build the URL with query parameters
       final path = '/booking/form'
           '?hallId=$hallId'
           '&date=$dateStr'
           '&startTime=$startTimeStr'
           '&endTime=$endTimeStr';
           
-      // 3. Push the new path. This is stable and survives hot restarts.
       context.push(path);
     }
   }
-  // ✅ ==========================================================
-  // ✅ END OF FIX
-  // ✅ ==========================================================
 
+  // --- ✅ 1. 'withOpacity' FIXED HERE ---
+  /// Returns the correct background color for a day based on bookings
+  Color _getDayColor(DateTime day, List<Booking> allBookings) {
+    final events = _getEventsForDay(day, allBookings);
+    
+    // (0.8 * 255).round() = 204
+    if (events.length > 2) {
+      return Colors.red.shade400.withAlpha(204); // Heavily Booked
+    }
+    if (events.isNotEmpty) {
+      return Colors.orange.shade400.withAlpha(204); // Partially Booked
+    }
+    return Colors.green.shade400.withAlpha(204); // Available
+  }
+
+  /// Builds the small legend item
+  Widget _buildLegendItem(Color color, String text) {
+    return Row(
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(text, style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
+
+  /// Builds the custom cell for the calendar
+  Widget _buildDayCell({
+    required DateTime day,
+    required Color backgroundColor,
+    required Color textColor,
+    BoxDecoration? decoration,
+  }) {
+    return Container(
+      margin: const EdgeInsets.all(4.0),
+      decoration: decoration ?? BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      child: Center(
+        child: Text(
+          '${day.day}',
+          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final allBookings = context.watch<AppState>().bookings;
+    final theme = Theme.of(context);
 
-    // Generate time slots for the dropdowns
+    // Generate time slots
     final startTimeSlots = _generateStartTimeSlots();
     final endTimeSlots = _selectedStartTime != null 
                          ? _generateEndTimeSlots(_selectedStartTime!) 
                          : <TimeOfDay>[];
 
     return Scaffold(
-      appBar: AppBar(title: Text('Select Date for ${widget.hall.name}')),
+      appBar: AppBar(
+        leading: TextButton.icon(
+          style: TextButton.styleFrom(
+            foregroundColor: theme.colorScheme.onSurface,
+          ),
+          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios, size: 14),
+          label: const Text('Change Hall'),
+        ),
+        leadingWidth: 120,
+        title: Text(widget.hall.name),
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- CALENDAR VIEW ---
-            Text('1. Select a Date', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
+            Text('Check Availability for ${widget.hall.name}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
             Card(
+              clipBehavior: Clip.antiAlias,
               child: TableCalendar<Booking>(
                 firstDay: DateTime.now().subtract(const Duration(days: 1)),
                 lastDay: DateTime.now().add(const Duration(days: 365)),
@@ -187,9 +238,86 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
                   return !day.isBefore(DateUtils.dateOnly(DateTime.now()));
                 },
                 eventLoader: (day) => _getEventsForDay(day, allBookings),
+                
+                calendarBuilders: CalendarBuilders(
+                  defaultBuilder: (context, day, focusedDay) {
+                    final color = _getDayColor(day, allBookings);
+                    return _buildDayCell(
+                      day: day,
+                      backgroundColor: color,
+                      textColor: Colors.white,
+                    );
+                  },
+                  outsideBuilder: (context, day, focusedDay) {
+                    return _buildDayCell(
+                      day: day,
+                      // ✅ 'withOpacity' FIXED HERE
+                      backgroundColor: Colors.grey.shade800.withAlpha(128), // ~0.5
+                      textColor: Colors.grey.shade400,
+                    );
+                  },
+                  disabledBuilder: (context, day, focusedDay) {
+                    return _buildDayCell(
+                      day: day,
+                      // ✅ 'withOpacity' FIXED HERE
+                      backgroundColor: Colors.grey.shade900.withAlpha(128), // ~0.5
+                      textColor: Colors.grey.shade700,
+                    );
+                  },
+                  todayBuilder: (context, day, focusedDay) {
+                    final color = _getDayColor(day, allBookings);
+                    return _buildDayCell(
+                      day: day,
+                      backgroundColor: color,
+                      textColor: Colors.white,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(8.0),
+                        border: Border.all(
+                          color: theme.primaryColor,
+                          width: 2.0,
+                        ),
+                      ),
+                    );
+                  },
+                  selectedBuilder: (context, day, focusedDay) {
+                    final color = _getDayColor(day, allBookings);
+                    return _buildDayCell(
+                      day: day,
+                      backgroundColor: color,
+                      textColor: Colors.white,
+                      decoration: BoxDecoration(
+                        color: theme.primaryColor,
+                        borderRadius: BorderRadius.circular(8.0),
+                        boxShadow: [
+                          BoxShadow(
+                            // ✅ 'withOpacity' FIXED HERE
+                            color: theme.primaryColor.withAlpha(128), // ~0.5
+                            blurRadius: 5,
+                            spreadRadius: 1,
+                          )
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
-            const SizedBox(height: 24),
+            
+            // --- ✅ 2. 'withOpacity' FIXED HERE ---
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildLegendItem(Colors.green.shade400.withAlpha(204), 'Available'),
+                  _buildLegendItem(Colors.orange.shade400.withAlpha(204), 'Partially Booked'),
+                  _buildLegendItem(Colors.red.shade400.withAlpha(204), 'Heavily Booked'),
+                ],
+              ),
+            ),
+            const Divider(),
+            const SizedBox(height: 16),
 
             // --- TIME SELECTION ---
             if (_selectedDay != null) ...[
@@ -206,7 +334,7 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
                 items: startTimeSlots.map((time) {
                   return DropdownMenuItem<TimeOfDay>(
                     value: time,
-                    child: Text(_formatTime(time)),
+                    child: Text(_formatStartTimeLabel(time)),
                   );
                 }).toList(),
                 onChanged: (value) {
@@ -230,7 +358,7 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
                 items: _selectedStartTime == null ? [] : endTimeSlots.map((time) {
                   return DropdownMenuItem<TimeOfDay>(
                     value: time,
-                    child: Text(_formatEndTimeLabel(time)),
+                    child: Text(_formatTime(time)),
                   );
                 }).toList(),
                 onChanged: (value) {

@@ -1,3 +1,5 @@
+// lib/providers/app_state.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:seminar_booking_app/services/auth_service.dart';
@@ -6,6 +8,7 @@ import 'package:seminar_booking_app/models/user.dart';
 import 'package:seminar_booking_app/models/seminar_hall.dart';
 import 'package:seminar_booking_app/models/booking.dart';
 import 'package:seminar_booking_app/models/notification.dart';
+import 'package:collection/collection.dart';
 
 class AppState with ChangeNotifier {
   final AuthService authService;
@@ -48,7 +51,7 @@ class AppState with ChangeNotifier {
 
   void _onAuthStateChanged(User? user) {
     _currentUser = user;
-    _isLoading = false; // This handles loading state on auth change
+    _isLoading = false; 
 
     _hallsSubscription?.cancel();
     _bookingsSubscription?.cancel();
@@ -56,7 +59,6 @@ class AppState with ChangeNotifier {
     _notificationsSubscription?.cancel();
 
     if (user != null) {
-      // General subscriptions for all users
       _hallsSubscription = firestoreService.getSeminarHalls().listen((halls) {
         _halls = halls;
         notifyListeners();
@@ -163,7 +165,26 @@ class AppState with ChangeNotifier {
   }
 
   Future<String?> updateUserRole(String uid, String newRole) async {
-    return await firestoreService.changeUserRole(uid: uid, newRole: newRole);
+    // This now calls the simple Firestore write
+    final error = await firestoreService.changeUserRole(uid: uid, newRole: newRole);
+    if (error == null) {
+      // Manually update local user list
+      final userIndex = _allUsers.indexWhere((u) => u.uid == uid);
+      if (userIndex != -1) {
+        _allUsers[userIndex] = User(
+          uid: _allUsers[userIndex].uid,
+          name: _allUsers[userIndex].name,
+          email: _allUsers[userIndex].email,
+          department: _allUsers[userIndex].department,
+          employeeId: _allUsers[userIndex].employeeId,
+          fcmTokens: _allUsers[userIndex].fcmTokens,
+          photoUrl: _allUsers[userIndex].photoUrl,
+          role: newRole,
+        );
+        notifyListeners();
+      }
+    }
+    return error;
   }
 
   Future<void> submitBooking(Booking booking) async {
@@ -189,7 +210,26 @@ class AppState with ChangeNotifier {
     if (newHall != null) {
       updateData['hall'] = newHall;
     }
+    
     await firestoreService.updateBooking(bookingId, updateData);
+
+    // Manually create notification
+    if (newStatus == 'Approved' || newStatus == 'Rejected') {
+      final booking = _bookings.firstWhereOrNull((b) => b.id == bookingId);
+      if (booking != null) {
+        final title = "Booking $newStatus!";
+        String body = "Your request for '${booking.title}' has been ${newStatus.toLowerCase()}.";
+        if(newStatus == 'Approved' && newHall != null) {
+          body += " It has been re-allocated to $newHall.";
+        }
+        await firestoreService.createNotification(
+          userId: booking.requesterId,
+          title: title,
+          body: body,
+          bookingId: bookingId,
+        );
+      }
+    }
   }
 
   void markNotificationsAsRead() {

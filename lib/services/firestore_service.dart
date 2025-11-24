@@ -1,5 +1,7 @@
+// lib/services/firestore_service.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+// Note: We are NOT importing cloud_functions here, as we are on the free plan.
 import 'package:seminar_booking_app/models/user.dart';
 import 'package:seminar_booking_app/models/seminar_hall.dart';
 import 'package:seminar_booking_app/models/booking.dart';
@@ -9,7 +11,7 @@ import 'package:seminar_booking_app/services/storage_service.dart';
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // --- ✅ FIX: Added photoUrl parameter ---
+  // --- USER METHODS ---
   Future<void> createUser({
     required String uid,
     required String name,
@@ -17,7 +19,7 @@ class FirestoreService {
     required String department,
     required String employeeId,
     String role = 'Faculty',
-    String? photoUrl, // Added this
+    String? photoUrl,
   }) {
     return _db.collection('users').doc(uid).set({
       'name': name,
@@ -26,7 +28,7 @@ class FirestoreService {
       'employeeId': employeeId,
       'role': role,
       'fcmTokens': [],
-      'photoUrl': photoUrl, // Added this
+      'photoUrl': photoUrl,
     });
   }
 
@@ -47,15 +49,18 @@ class FirestoreService {
   }
 
   Future<void> updateUserProfile(String uid, Map<String, dynamic> data) {
+    // We allow name, department, and employeeId to be updated.
     data.remove('email');
     data.remove('role');
     return _db.collection('users').doc(uid).update(data);
   }
 
   Future<void> deleteUser(String uid) {
+    // This only deletes the Firestore document, not the Auth user.
     return _db.collection('users').doc(uid).delete();
   }
 
+  
   // --- HALL METHODS ---
   Stream<List<SeminarHall>> getSeminarHalls() {
     return _db.collection('seminarHalls').snapshots().map((snapshot) =>
@@ -181,24 +186,35 @@ class FirestoreService {
     await batch.commit();
   }
 
+  Future<void> createNotification({
+    required String userId,
+    required String title,
+    required String body,
+    String? bookingId,
+  }) {
+    return _db.collection('notifications').add({
+      'userId': userId,
+      'title': title,
+      'body': body,
+      'bookingId': bookingId,
+      'isRead': false,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  }
+
   // --- ROLE MANAGEMENT ---
   Future<String?> changeUserRole({
     required String uid,
     required String newRole,
   }) async {
+    // This is a simple database write, allowed by our Firestore rules.
+    // No Cloud Function is needed.
     try {
-      final callable =
-          FirebaseFunctions.instance.httpsCallable('changeUserRole');
-      await callable.call(<String, dynamic>{
-        'uid': uid,
-        'newRole': newRole,
-      });
       await _db.collection('users').doc(uid).update({'role': newRole});
-      return null;
-    } on FirebaseFunctionsException catch (e) {
-      return e.message;
+      return null; // Success
     } catch (e) {
-      return "An unexpected client-side error occurred.";
+      print("Error changing user role: $e");
+      return e.toString(); // Return the error
     }
   }
 }
