@@ -43,9 +43,16 @@ service cloud.firestore {
     // 4. Notifications Collection
     match /notifications/{notificationId} {
       allow read: if request.auth.uid == resource.data.userId;
-      // Admins create notifications (when approving), Users update (when reading)
-      allow create: if isAdmin();
+      // Anyone can create notifications (faculty when booking, admins when responding)
+      allow create: if request.auth != null;
       allow update: if request.auth.uid == resource.data.userId;
+    }
+
+    // 5. Admin Directory - list of admin UIDs
+    // Any authenticated user can read the directory; any user can write (system maintains it)
+    match /adminDirectory/{adminId} {
+      allow get, list: if request.auth != null;
+      allow create, update, delete: if request.auth != null;
     }
   }
 }

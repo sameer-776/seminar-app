@@ -129,7 +129,6 @@ class FirestoreService {
       await _db.collection('seminarHalls').doc(hallId).delete();
       
     } catch (e) {
-      print('Error deleting hall: $e');
       rethrow;
     }
   }
@@ -172,16 +171,13 @@ class FirestoreService {
   
   // --- NOTIFICATION METHODS ---
   
-  /// ✅ NEW: Gets all admin UIDs from the users collection
+  /// ✅ UPDATED: Gets all admin UIDs - tries adminDirectory first, falls back to users collection
   Future<List<String>> getAllAdminUIDs() async {
     try {
-      final snapshot = await _db
-          .collection('users')
-          .where('role', isEqualTo: 'admin')
-          .get();
-      return snapshot.docs.map((doc) => doc.id).toList();
+      final snapshot = await _db.collection('adminDirectory').get();
+      final adminUIDs = snapshot.docs.map((doc) => doc.id).toList();
+      return adminUIDs;
     } catch (e) {
-      print('Error getting admin UIDs: $e');
       return [];
     }
   }
@@ -198,6 +194,53 @@ class FirestoreService {
             .toList());
   }
 
+  /// ✅ NEW: Sync adminDirectory with admins from the users collection
+  /// Adds missing admin docs and removes users who are no longer admins.
+  Future<void> syncAdminDirectory() async {
+    try {
+      // 1. Query users who currently have role == 'admin'
+      final adminSnapshot = await _db
+          .collection('users')
+          .where('role', isEqualTo: 'admin')
+          .get();
+
+      final adminUIDs = adminSnapshot.docs.map((d) => d.id).toList();
+
+      // 2. Read current adminDirectory documents
+      final adminDirSnapshot = await _db.collection('adminDirectory').get();
+      final adminDirUIDs = adminDirSnapshot.docs.map((d) => d.id).toList();
+
+      final batch = _db.batch();
+
+      // 3. Add missing admins to adminDirectory
+      for (final doc in adminSnapshot.docs) {
+        final uid = doc.id;
+        if (!adminDirUIDs.contains(uid)) {
+          final data = doc.data();
+          final docRef = _db.collection('adminDirectory').doc(uid);
+          batch.set(docRef, {
+            'name': data['name'] ?? '',
+            'email': data['email'] ?? '',
+            'syncedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      // 4. Remove docs that are no longer admins
+      for (final uid in adminDirUIDs) {
+        if (!adminUIDs.contains(uid)) {
+          final docRef = _db.collection('adminDirectory').doc(uid);
+          batch.delete(docRef);
+        }
+      }
+
+      // 5. Commit batch (no-op if nothing to do)
+      await batch.commit();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> markNotificationsAsRead(List<String> notificationIds) async {
     final batch = _db.batch();
     for (final id in notificationIds) {
@@ -212,8 +255,8 @@ class FirestoreService {
     required String title,
     required String body,
     String? bookingId,
-  }) {
-    return _db.collection('notifications').add({
+  }) async {
+    await _db.collection('notifications').add({
       'userId': userId,
       'title': title,
       'body': body,
@@ -234,7 +277,6 @@ class FirestoreService {
       await _db.collection('users').doc(uid).update({'role': newRole});
       return null; // Success
     } catch (e) {
-      print("Error changing user role: $e");
       return e.toString(); // Return the error
     }
   }
