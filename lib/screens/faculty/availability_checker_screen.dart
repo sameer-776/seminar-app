@@ -129,7 +129,7 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
     if (events.length > 2) {
       return Colors.red.shade400.withAlpha(204); 
     }
-    if (events.length > 0) {
+    if (events.isNotEmpty) {
       return Colors.orange.shade400.withAlpha(204); 
     }
     return Colors.green.shade400.withAlpha(204); 
@@ -335,7 +335,7 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
               const SizedBox(height: 16),
               
               DropdownButtonFormField<TimeOfDay>(
-                value: _selectedStartTime,
+                initialValue: _selectedStartTime,
                 hint: const Text('Select start time'),
                 decoration: const InputDecoration(
                   labelText: 'Start Time',
@@ -359,7 +359,7 @@ class _AvailabilityCheckerScreenState extends State<AvailabilityCheckerScreen> {
               const SizedBox(height: 16),
 
               DropdownButtonFormField<TimeOfDay>(
-                value: _selectedEndTime,
+                initialValue: _selectedEndTime,
                 hint: const Text('Select end time'),
                 decoration: const InputDecoration(
                   labelText: 'End Time',

@@ -267,7 +267,7 @@ class AppState with ChangeNotifier {
     if (newStatus == 'Approved' || newStatus == 'Rejected') {
       final booking = _bookings.firstWhereOrNull((b) => b.id == bookingId);
       if (booking != null) {
-        final title = "Booking ${newStatus}!";
+        final title = "Booking $newStatus!";
         String body = "Your request for '${booking.title}' has been ${newStatus.toLowerCase()}.";
         if(newStatus == 'Approved' && newHall != null) {
           body += " It has been re-allocated to $newHall.";
