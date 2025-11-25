@@ -71,9 +71,34 @@ async function getAllAdminIds() {
   }
 }
 
+/**
+ * ✅ NEW HELPER
+ * Creates an in-app notification with an optional bookingId.
+ */
+async function createInAppNotificationWithBooking(
+  userId,
+  title,
+  body,
+  bookingId = null
+) {
+  const notificationData = {
+    userId: userId,
+    title: title,
+    body: body,
+    isRead: false,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  if (bookingId) {
+    notificationData.bookingId = bookingId;
+  }
+  console.log(`Creating in-app notification for user ${userId}`);
+  await db.collection("notifications").add(notificationData);
+}
+
 exports.onBookingCreate = functions.firestore
   .document("bookings/{bookingId}")
   .onCreate(async (snapshot) => {
+    const bookingId = snapshot.id; // Get the document ID
     const newBooking = snapshot.data();
 
     if (newBooking.status !== "Pending") {
@@ -90,10 +115,12 @@ exports.onBookingCreate = functions.firestore
       `A new request for "${newBooking.title}" ` +
       `was submitted by ${newBooking.requestedBy}.`;
 
-    // Create a notification for every admin
+    // Create a notification for every admin (with bookingId for linking)
     const promises = [];
     adminIds.forEach((adminId) => {
-      promises.push(createInAppNotification(adminId, title, body));
+      promises.push(
+        createInAppNotificationWithBooking(adminId, title, body, bookingId)
+      );
       promises.push(sendDeviceNotificationToUser(adminId, title, body));
     });
 
@@ -105,6 +132,7 @@ exports.onBookingCreate = functions.firestore
 exports.onBookingStatusUpdate = functions.firestore
   .document("bookings/{bookingId}")
   .onUpdate(async (change) => {
+    const bookingId = change.after.ref.id; // Get the document ID
     const before = change.before.data();
     const after = change.after.data();
 
@@ -135,7 +163,7 @@ exports.onBookingStatusUpdate = functions.firestore
     }
 
     await Promise.all([
-      createInAppNotification(userId, title, body),
+      createInAppNotificationWithBooking(userId, title, body, bookingId),
       sendDeviceNotificationToUser(userId, title, body),
     ]);
     return null;

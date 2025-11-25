@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:seminar_booking_app/services/auth_service.dart';
 import 'package:seminar_booking_app/services/firestore_service.dart';
 import 'package:seminar_booking_app/models/user.dart';
@@ -8,7 +9,7 @@ import 'package:seminar_booking_app/models/booking.dart';
 import 'package:seminar_booking_app/models/notification.dart';
 import 'package:collection/collection.dart';
 
-class AppState with ChangeNotifier {
+class AppState with ChangeNotifier, WidgetsBindingObserver {
   final AuthService authService;
   final FirestoreService firestoreService;
 
@@ -25,6 +26,9 @@ class AppState with ChangeNotifier {
   StreamSubscription<List<Booking>>? _bookingsSubscription;
   StreamSubscription<List<User>>? _allUsersSubscription;
   StreamSubscription<List<AppNotification>>? _notificationsSubscription;
+  Timer? _midnightTimer;
+  DateTime? _lastAdminSyncDate;
+  bool _isAdminSyncing = false;
 
   // Public Getters
   User? get currentUser => _currentUser;
@@ -45,6 +49,8 @@ class AppState with ChangeNotifier {
 
   AppState({required this.authService, required this.firestoreService}) {
     _authSubscription = authService.user.listen(_onAuthStateChanged);
+    WidgetsBinding.instance.addObserver(this);
+    _startMidnightTimer();
   }
 
   void _onAuthStateChanged(User? user) {
@@ -57,6 +63,10 @@ class AppState with ChangeNotifier {
     _notificationsSubscription?.cancel();
 
     if (user != null) {
+      // ✅ UPDATED: Run adminDirectory sync for ANY user login to ensure admins are always listed
+      // (This allows faculty to create notifications for admins)
+      _runAdminDirectorySync();
+
       _hallsSubscription = firestoreService.getSeminarHalls().listen((halls) {
         _halls = halls;
         notifyListeners();
@@ -92,6 +102,56 @@ class AppState with ChangeNotifier {
       _notifications = [];
     }
     notifyListeners();
+  }
+
+  // WidgetsBindingObserver: run sync when app resumes
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Catch missed midnight while app was in background (any authenticated user can trigger this)
+      if (_currentUser != null) {
+        _runAdminDirectorySync();
+      }
+    }
+  }
+
+  void _startMidnightTimer() {
+    // Periodically check once per minute whether we've crossed to a new day
+    _midnightTimer?.cancel();
+    _midnightTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _checkAndRunDailySync();
+    });
+  }
+
+  void _checkAndRunDailySync() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (_lastAdminSyncDate == null) {
+      // never synced yet
+      _runAdminDirectorySync();
+      return;
+    }
+    final last = DateTime(_lastAdminSyncDate!.year, _lastAdminSyncDate!.month, _lastAdminSyncDate!.day);
+    if (last.isBefore(today)) {
+      // it's a new day since last sync
+      _runAdminDirectorySync();
+    }
+  }
+
+  Future<void> _runAdminDirectorySync() async {
+    if (_isAdminSyncing) return; // avoid concurrent runs
+    _isAdminSyncing = true;
+    try {
+      await firestoreService.syncAdminDirectory();
+      final now = DateTime.now();
+      _lastAdminSyncDate = DateTime(now.year, now.month, now.day);
+    } catch (e) {
+      // For non-admins, Firestore will block writes with permission error.
+      // Continue—the important part is reading the existing admins.
+    } finally {
+      _isAdminSyncing = false;
+    }
   }
 
   Future<bool> login(String email, String password) async {
@@ -209,7 +269,7 @@ class AppState with ChangeNotifier {
         }
       }
     } catch (e) {
-      print("Error checking conflict: $e");
+      // Error checking conflict
     }
     return null; // No conflict found
   }
@@ -225,7 +285,27 @@ class AppState with ChangeNotifier {
     if (checkBookingConflict(booking.hall, booking.date, booking.startTime, booking.endTime)) {
       throw Exception("This time slot is already booked! Please choose another time.");
     }
-    await firestoreService.addBooking(booking);
+    
+    // 1. Create the booking document
+    final bookingDocRef = await firestoreService.addBookingAndGetRef(booking);
+    
+    // 2. ✅ NEW: Create notifications for all admins
+    try {
+      final adminUIDs = await firestoreService.getAllAdminUIDs();
+      
+      if (adminUIDs.isNotEmpty) {
+        for (final adminUID in adminUIDs) {
+          await firestoreService.createNotification(
+            userId: adminUID,
+            title: 'New Booking Request',
+            body: '${booking.requestedBy} has requested ${booking.hall} for ${booking.date}.',
+            bookingId: bookingDocRef,
+          );
+        }
+      }
+    } catch (e) {
+      // Don't rethrow - booking was successfully created, just notification failed
+    }
   }
 
   Future<void> cancelBooking(String bookingId) async {
@@ -303,6 +383,8 @@ class AppState with ChangeNotifier {
     _bookingsSubscription?.cancel();
     _allUsersSubscription?.cancel();
     _notificationsSubscription?.cancel();
+    _midnightTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 }

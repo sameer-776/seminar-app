@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:seminar_booking_app/models/booking.dart';
 import 'package:seminar_booking_app/models/seminar_hall.dart';
 import 'package:seminar_booking_app/providers/app_state.dart';
-import 'package:seminar_booking_app/services/firestore_service.dart'; // Import service
 
 class BookingFormScreen extends StatefulWidget {
   final SeminarHall hall;
@@ -74,7 +73,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       setState(() => _isLoading = true);
       
       final appState = context.read<AppState>();
-      final firestoreService = context.read<FirestoreService>();
       final currentUser = appState.currentUser;
 
       if (currentUser == null) {
@@ -105,27 +103,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
 
       try {
         // 1. Submit the booking
+        // The Cloud Function (onBookingCreate) will automatically:
+        // - Send notifications to all admins
+        // - Send device push notifications to all admins
         await appState.submitBooking(newBooking);
-
-        // 2. ✅ MANUALLY NOTIFY ADMINS
-        // We need to find all admin users and send them a notification
-        try {
-          // Ideally, we would have a better way to get admins, but querying all users works for small apps
-          final allUsersStream = firestoreService.getAllUsers();
-          final allUsers = await allUsersStream.first;
-          final admins = allUsers.where((u) => u.role == 'admin').toList();
-
-          for (var admin in admins) {
-            await firestoreService.createNotification(
-              userId: admin.uid,
-              title: 'New Request Submitted',
-              body: '${currentUser.name} has requested ${widget.hall.name} for ${DateFormat.yMMMd().format(widget.date)}.',
-              bookingId: null, // We don't have the ID here easily, but that's okay
-            );
-          }
-        } catch (e) {
-          print("Error sending admin notifications: $e");
-        }
 
         if (mounted) {
           context.go('/booking/confirmation');
